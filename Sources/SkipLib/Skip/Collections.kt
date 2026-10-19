@@ -549,7 +549,10 @@ interface BidirectionalCollection<Element>: Collection<Element>, MutableListStor
     }
 
     val last: Element?
-        get() = if (isEmpty) null else elementAt(effectiveStorageEndIndex - 1).sref()
+        // VDS fork (vds.1): index the backing collection (O(1) for a list), as `first` does. The
+        // unqualified elementAt() was Kotlin's Iterable.elementAt over this sequence's sref'ing
+        // iterator: a walk that copied every struct element on the way.
+        get() = if (isEmpty) null else collection.elementAt(effectiveStorageEndIndex - 1).sref()
 
     fun lastIndex(of: Element): Int? {
         val lastIndex = collection.lastIndexOf(of)

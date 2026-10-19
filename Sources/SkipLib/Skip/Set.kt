@@ -182,10 +182,12 @@ class Set<Element>: Collection<Element>, SetAlgebra<Set<Element>, Element>, Muta
     override fun intersection(other: Set<Element>): Set<Element> = intersection(other as Sequence<Element>)
     override fun symmetricDifference(other: Set<Element>): Set<Element> = symmetricDifference(other as Sequence<Element>)
 
+    // VDS fork (vds.1): insert/remove/update check membership with the hash-based contains()
+    // instead of indexOf(), which walked the LinkedHashSet and made loop-built sets quadratic.
+    // Swift returns the member already in the set; storedMember() finds it.
     override fun insert(element: Element): Tuple2<Boolean, Element> {
-        val indexOf = storage.indexOf(element)
-        if (indexOf != -1) {
-            return Tuple2(false, storage.elementAt(indexOf))
+        if (storage.contains(element)) {
+            return Tuple2(false, storedMember(element))
         }
         willmutate()
         mutableStorage.add(element.sref())
@@ -195,12 +197,11 @@ class Set<Element>: Collection<Element>, SetAlgebra<Set<Element>, Element>, Muta
 
     override fun remove(element: Element): Element? {
         willmutate()
-        val index = storage.indexOf(element)
         val ret: Element?
-        if (index == -1) {
+        if (!storage.contains(element)) {
             ret = null
         } else {
-            ret = storage.elementAt(index)
+            ret = storedMember(element)
             mutableStorage.remove(element)
         }
         didmutate()
@@ -209,17 +210,32 @@ class Set<Element>: Collection<Element>, SetAlgebra<Set<Element>, Element>, Muta
 
     override fun update(with: Element): Element? {
         willmutate()
-        val index = storage.indexOf(with)
         val ret: Element?
-        if (index == -1) {
+        if (!storage.contains(with)) {
             ret = null
         } else {
-            ret = storage.elementAt(index)
+            ret = storedMember(with)
             mutableStorage.remove(with)
         }
         mutableStorage.add(with.sref())
         didmutate()
         return ret
+    }
+
+    /// The member equal to `element`, which the caller has checked is in the set. Equal strings,
+    /// numbers, characters, booleans and Kotlin enums cannot be told apart, so `element` itself is
+    /// returned in O(1); any other type may differ from its equal member in identity or in fields
+    /// that equality ignores, so it is found by a scan as before.
+    private fun storedMember(element: Element): Element {
+        if (element == null || element is String || element is Number || element is Char || element is Boolean || element is Enum<*>) {
+            return element
+        }
+        for (member in storage) {
+            if (member == element) {
+                return member
+            }
+        }
+        return element
     }
 
     override fun formUnion(other: Set<Element>) = formUnion(other as Sequence<Element>)
