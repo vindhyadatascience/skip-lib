@@ -4,7 +4,7 @@ package skip.lib
 
 /// Create a set with the given content.
 fun <Element> setOf(vararg elements: Element): Set<Element> {
-    val storage = LinkedHashSet<Element>()
+    val storage = CanonicalSetStorage<Element>()
     for (element in elements) {
         storage.add(element.sref())
     }
@@ -15,7 +15,7 @@ fun <Element> setOf(vararg elements: Element): Set<Element> {
 ///
 /// We can't make this a true constructor because Kotlin doesn't have enough information to infer the element type.
 fun Set(string: String): Set<Char> {
-    val storage = LinkedHashSet<Char>()
+    val storage = CanonicalSetStorage<Char>()
     for (c in string) {
         storage.add(c)
     }
@@ -29,11 +29,11 @@ class Set<Element>: Collection<Element>, SetAlgebra<Set<Element>, Element>, Muta
     // We attempt to avoid copying when possible. This may involve sharing storage. When storage is
     // shared, we copy on write and rely on our sharing partners to do the same
     private var isStorageShared = false
-    internal var storage: LinkedHashSet<Element>
-    internal val mutableStorage: LinkedHashSet<Element>
+    private var storage: CanonicalSetStorage<Element>
+    private val mutableStorage: CanonicalSetStorage<Element>
         get() {
             if (isStorageShared) {
-                storage = LinkedHashSet(storage)
+                storage = CanonicalSetStorage(storage)
                 isStorageShared = false
             }
             return storage
@@ -51,7 +51,7 @@ class Set<Element>: Collection<Element>, SetAlgebra<Set<Element>, Element>, Muta
     override fun didMutateStorage() = didmutate()
 
     constructor(minimumCapacity: Int = 0) {
-        storage = LinkedHashSet()
+        storage = CanonicalSetStorage()
     }
 
     constructor(collection: Sequence<Element>, nocopy: Boolean = false) {
@@ -61,17 +61,20 @@ class Set<Element>: Collection<Element>, SetAlgebra<Set<Element>, Element>, Muta
             collection.isStorageShared = true
             isStorageShared = true
         } else {
-            storage = LinkedHashSet()
+            storage = CanonicalSetStorage()
             storage.addAll(collection)
         }
     }
 
     constructor(collection: Iterable<Element>, nocopy: Boolean = false, shared: Boolean = false) {
-        if (nocopy && collection is LinkedHashSet<Element>) {
+        if (nocopy && collection is CanonicalSetStorage<Element>) {
             storage = collection
             isStorageShared = shared
         } else {
-            storage = LinkedHashSet()
+            // `nocopy` is an interop hint, not a promise to adopt arbitrary Kotlin storage.
+            // A foreign MutableSet cannot retrieve its canonical equal member, so import it
+            // into our store. As before, nocopy suppresses element/deep conversions.
+            storage = CanonicalSetStorage()
             if (nocopy) {
                 storage.addAll(collection)
             } else {
@@ -182,9 +185,9 @@ class Set<Element>: Collection<Element>, SetAlgebra<Set<Element>, Element>, Muta
     override fun intersection(other: Set<Element>): Set<Element> = intersection(other as Sequence<Element>)
     override fun symmetricDifference(other: Set<Element>): Set<Element> = symmetricDifference(other as Sequence<Element>)
 
-    // VDS fork (vds.1): insert/remove/update check membership with the hash-based contains()
-    // instead of indexOf(), which walked the LinkedHashSet and made loop-built sets quadratic.
-    // Swift returns the member already in the set; storedMember() finds it.
+    // VDS fork: both membership and the canonical equal member use hash lookups. With ordinary
+    // hashes these operations have expected O(1) cost on unshared storage, including custom
+    // structs/classes whose equality ignores fields or identity. Copy-on-write is unchanged.
     override fun insert(element: Element): Tuple2<Boolean, Element> {
         if (storage.contains(element)) {
             return Tuple2(false, storedMember(element))
@@ -222,20 +225,10 @@ class Set<Element>: Collection<Element>, SetAlgebra<Set<Element>, Element>, Muta
         return ret
     }
 
-    /// The member equal to `element`, which the caller has checked is in the set. Equal strings,
-    /// numbers, characters, booleans and Kotlin enums cannot be told apart, so `element` itself is
-    /// returned in O(1); any other type may differ from its equal member in identity or in fields
-    /// that equality ignores, so it is found by a scan as before.
+    /// The member equal to `element`, which the caller has checked is in the set. The backing
+    /// map retains the first member itself as its value, not just its equal key.
     private fun storedMember(element: Element): Element {
-        if (element == null || element is String || element is Number || element is Char || element is Boolean || element is Enum<*>) {
-            return element
-        }
-        for (member in storage) {
-            if (member == element) {
-                return member
-            }
-        }
-        return element
+        return storage.member(element)
     }
 
     override fun formUnion(other: Set<Element>) = formUnion(other as Sequence<Element>)
@@ -285,4 +278,46 @@ class Set<Element>: Collection<Element>, SetAlgebra<Set<Element>, Element>, Muta
 
     companion object {
     }
+}
+
+/// A single source of truth for membership, iteration and the canonical stored member.
+/// Keeping a second lookup index next to a LinkedHashSet would let iterator removal, bulk
+/// collection operations or the Kotlin MutableSet view silently invalidate that index.
+/// AbstractMutableSet routes those operations through this adapter and its map iterator.
+private class CanonicalSetStorage<Element> : AbstractMutableSet<Element> {
+    private val members = LinkedHashMap<Element, Element>()
+
+    constructor() : super()
+
+    constructor(elements: Iterable<Element>) : this() {
+        addAll(elements)
+    }
+
+    override val size: Int
+        get() = members.size
+
+    override fun contains(element: Element): Boolean = members.containsKey(element)
+
+    fun member(element: Element): Element = members.getValue(element)
+
+    override fun add(element: Element): Boolean {
+        // A present nullable member has a null value too; testing get() alone loses it.
+        if (members.containsKey(element)) {
+            return false
+        }
+        members[element] = element
+        return true
+    }
+
+    override fun remove(element: Element): Boolean {
+        if (!members.containsKey(element)) {
+            return false
+        }
+        members.remove(element)
+        return true
+    }
+
+    override fun clear() = members.clear()
+
+    override fun iterator(): MutableIterator<Element> = members.values.iterator()
 }
