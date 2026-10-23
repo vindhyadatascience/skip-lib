@@ -103,7 +103,10 @@ class Set<Element>: Collection<Element>, SetAlgebra<Set<Element>, Element>, Muta
     fun symmetricDifference(other: Sequence<Element>): Set<Element> {
         val ret = Set(other)
         for (element in storage) {
-            if (ret.remove(element) == null) {
+            // A stored null member is distinct from absence even though remove returns null.
+            if (ret.contains(element)) {
+                ret.remove(element)
+            } else {
                 ret.insert(element)
             }
         }
@@ -117,8 +120,10 @@ class Set<Element>: Collection<Element>, SetAlgebra<Set<Element>, Element>, Muta
     }
 
     fun formIntersection(other: Sequence<Element>) {
+        // Snapshot before mutating: the other sequence may be this set or share its storage.
+        val retained = other.iterable.toSet()
         willmutate()
-        other.iterable.forEach { mutableStorage.remove(it) }
+        mutableStorage.retainAll(retained)
         didmutate()
     }
 
