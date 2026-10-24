@@ -8,7 +8,13 @@ public protocol Hashable: Equatable {
     var hashValue: Int { get }
 }
 
-typealias AnyHashable = Hashable
+public struct AnyHashable: Hashable {
+    public init<H: Hashable>(_ base: H) {
+    }
+
+    public var base: Any { fatalError() }
+    public var hashValue: Int { fatalError() }
+}
 
 public struct Hasher {
     public init() {

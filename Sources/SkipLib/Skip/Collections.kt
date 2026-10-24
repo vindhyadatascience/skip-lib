@@ -223,7 +223,7 @@ interface Sequence<Element>: IterableStorage<Element> {
         return true
     }
 
-    fun elementsEqual(other: Sequence<Element>, by: (Element, Element) -> Boolean = { it1, it2 -> it1 == it2 }): Boolean {
+    fun elementsEqual(other: Sequence<Element>, by: (Element, Element) -> Boolean = { it1, it2 -> swiftEquatableEquals(it1, it2) }): Boolean {
         val itr = this.iterable.iterator()
         val otherItr = other.iterable.iterator()
         while (itr.hasNext()) {
@@ -280,7 +280,7 @@ interface Sequence<Element>: IterableStorage<Element> {
     }
 
     fun contains(element: Element): Boolean {
-        return iterable.contains(element)
+        return iterable.any { swiftEquatableEquals(it, element) }
     }
 }
 
@@ -442,7 +442,7 @@ interface Collection<Element>: Sequence<Element>, CollectionStorage<Element> {
     }
 
     fun firstIndex(of: Element): Int? {
-        val index = indexOf(of)
+        val index = indexOfFirst { swiftEquatableEquals(it, of) }
         return if (index == -1) null else index
     }
 
@@ -555,7 +555,7 @@ interface BidirectionalCollection<Element>: Collection<Element>, MutableListStor
         get() = if (isEmpty) null else collection.elementAt(effectiveStorageEndIndex - 1).sref()
 
     fun lastIndex(of: Element): Int? {
-        val lastIndex = collection.lastIndexOf(of)
+        val lastIndex = collection.indexOfLast { swiftEquatableEquals(it, of) }
         return if (lastIndex < storageStartIndex || lastIndex >= effectiveStorageEndIndex) null else lastIndex
     }
 

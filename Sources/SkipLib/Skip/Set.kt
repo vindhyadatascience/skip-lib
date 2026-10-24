@@ -91,13 +91,15 @@ class Set<Element>: Collection<Element>, SetAlgebra<Set<Element>, Element>, Muta
         get() = count == 0
 
     fun union(other: Sequence<Element>): Set<Element> {
-        val union = storage.union(other.iterable)
-        return Set(union, nocopy = true)
+        val result = Set(this, nocopy = true)
+        result.formUnion(other)
+        return result
     }
 
     fun intersection(other: Sequence<Element>): Set<Element> {
-        val intersection = storage.intersect(other.iterable)
-        return Set(intersection, nocopy = true)
+        val result = Set(this, nocopy = true)
+        result.formIntersection(other)
+        return result
     }
 
     fun symmetricDifference(other: Sequence<Element>): Set<Element> {
@@ -114,22 +116,29 @@ class Set<Element>: Collection<Element>, SetAlgebra<Set<Element>, Element>, Muta
     }
 
     fun formUnion(other: Sequence<Element>) {
+        // IEEE NaN is not a duplicate of itself, so even a self-union can insert members.
+        // Snapshot that alias before changing the map being iterated.
+        val elements = if (other === this) CanonicalSetStorage(storage) else other.iterable
         willmutate()
-        other.iterable.forEach { mutableStorage.add(it.sref()) }
+        elements.forEach { mutableStorage.add(it.sref()) }
         didmutate()
     }
 
     fun formIntersection(other: Sequence<Element>) {
         // Snapshot before mutating: the other sequence may be this set or share its storage.
-        val retained = other.iterable.toSet()
+        val retained = CanonicalSetStorage(other.iterable)
         willmutate()
-        mutableStorage.retainAll(retained)
+        val iterator = mutableStorage.iterator()
+        while (iterator.hasNext()) {
+            if (!retained.contains(iterator.next())) iterator.remove()
+        }
         didmutate()
     }
 
     fun formSymmetricDifference(other: Sequence<Element>) {
+        val elements = CanonicalSetStorage(other.iterable)
         willmutate()
-        for (element in other.iterable) {
+        for (element in elements) {
             if (!mutableStorage.remove(element)) {
                 mutableStorage.add(element.sref())
             }
@@ -138,8 +147,9 @@ class Set<Element>: Collection<Element>, SetAlgebra<Set<Element>, Element>, Muta
     }
 
     fun subtracting(other: Sequence<Element>): Set<Element> {
-        val subtraction = storage.subtract(other.iterable)
-        return Set(subtraction, nocopy = true)
+        val result = Set(this, nocopy = true)
+        result.subtract(other)
+        return result
     }
 
     fun isSubset(of: Sequence<Element>): Boolean {
@@ -171,7 +181,12 @@ class Set<Element>: Collection<Element>, SetAlgebra<Set<Element>, Element>, Muta
 
     fun subtract(other: Sequence<Element>) {
         willmutate()
-        mutableStorage.removeAll(other.iterable)
+        // Explicit lookups avoid Kotlin bulk-operation paths that use boxed JVM equality.
+        val removed = CanonicalSetStorage(other.iterable)
+        val iterator = mutableStorage.iterator()
+        while (iterator.hasNext()) {
+            if (removed.contains(iterator.next())) iterator.remove()
+        }
         didmutate()
     }
 
@@ -290,7 +305,7 @@ class Set<Element>: Collection<Element>, SetAlgebra<Set<Element>, Element>, Muta
 /// collection operations or the Kotlin MutableSet view silently invalidate that index.
 /// AbstractMutableSet routes those operations through this adapter and its map iterator.
 private class CanonicalSetStorage<Element> : AbstractMutableSet<Element> {
-    private val members = LinkedHashMap<Element, Element>()
+    private val members = SwiftHashableMap<Element, Element>()
 
     constructor() : super()
 
@@ -324,5 +339,10 @@ private class CanonicalSetStorage<Element> : AbstractMutableSet<Element> {
 
     override fun clear() = members.clear()
 
+    override fun removeAll(elements: kotlin.collections.Collection<Element>): Boolean = members.keys.removeAll(elements)
+    override fun retainAll(elements: kotlin.collections.Collection<Element>): Boolean = members.keys.retainAll(elements)
+
     override fun iterator(): MutableIterator<Element> = members.values.iterator()
+
+    override fun hashCode(): Int = members.keys.sumOf { swiftEquatableHash(it) }
 }

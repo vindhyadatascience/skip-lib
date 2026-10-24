@@ -26,8 +26,7 @@ public struct Dictionary<Key, Value>: Collection {
     public init(_ keysAndValues: any Sequence<(Key, Value)>, uniquingKeysWith combine: (Value, Value) throws -> Value) rethrows {
     }
 
-    @available(*, unavailable)
-    public init(grouping values: any Sequence<Value>, by keyForValue: (Value) throws -> Key) rethrows {
+    public init<S: Sequence>(grouping values: S, by keyForValue: (S.Element) throws -> Key) rethrows where Value == [S.Element] {
     }
 
     public func filter(_ isIncluded: ((Key, Value)) throws -> Bool) rethrows -> Dictionary<Key, Value> {

@@ -31,6 +31,15 @@ public struct String: RandomAccessCollection {
         fatalError()
     }
 
+    public mutating func append(_ other: Character) {
+    }
+
+    public mutating func append(_ other: String) {
+    }
+
+    public mutating func append(contentsOf newElements: any Sequence<Character>) {
+    }
+
     public func hasPrefix(_ prefix: String) -> Bool {
         fatalError()
     }

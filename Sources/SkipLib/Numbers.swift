@@ -29,6 +29,20 @@ extension Int32: CustomStringConvertible {
 }
 
 extension Int: CustomStringConvertible {
+    public init?(exactly source: Double) { fatalError() }
+    public init?(exactly source: Float) { fatalError() }
+    public init?(exactly source: Int8) { fatalError() }
+    public init?(exactly source: Int16) { fatalError() }
+    public init?(exactly source: Int32) { fatalError() }
+    public init?(exactly source: Int) { fatalError() }
+    public init?(exactly source: Int64) { fatalError() }
+    public init?(exactly source: Int128) { fatalError() }
+    public init?(exactly source: UInt8) { fatalError() }
+    public init?(exactly source: UInt16) { fatalError() }
+    public init?(exactly source: UInt32) { fatalError() }
+    public init?(exactly source: UInt) { fatalError() }
+    public init?(exactly source: UInt64) { fatalError() }
+    public init?(exactly source: UInt128) { fatalError() }
     public static let max: Int = 0
     public static let min: Int = 0
     public static func random(in range: Range<Int>) -> Int { fatalError() }
@@ -120,6 +134,7 @@ extension Float: CustomStringConvertible {
     @available(*, unavailable)
     public static func random(in range: Range<Float>, using gen: inout RandomNumberGenerator) -> Float { fatalError() }
     public func rounded() -> Float
+    public func squareRoot() -> Float
     public func rounded(_ rule: FloatingPointRoundingRule) -> Float
 }
 
@@ -135,6 +150,7 @@ extension Double: CustomStringConvertible {
     @available(*, unavailable)
     public static func random(in range: Range<Double>, using gen: inout RandomNumberGenerator) -> Double { fatalError() }
     public func rounded() -> Double
+    public func squareRoot() -> Double
     public func rounded(_ rule: FloatingPointRoundingRule) -> Double
 }
 

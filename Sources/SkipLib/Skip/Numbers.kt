@@ -16,7 +16,7 @@ fun Byte.Companion.random(in_: IntRange, using: InOut<RandomNumberGenerator>? = 
     return Byte(in_.start + mod)
 }
 
-val UByte.Companion.max: Byte get() = Byte.MAX_VALUE
+val UByte.Companion.max: UByte get() = UByte.MAX_VALUE
 val UByte.Companion.min: UByte get() = UByte.MIN_VALUE
 fun UByte.Companion.random(in_: UIntRange, using: InOut<RandomNumberGenerator>? = null): UByte {
     if (in_.endInclusive < in_.start) {
@@ -198,6 +198,29 @@ fun Int(number: UShort): Int = number.toInt()
 fun Int(number: UInt): Int = number.toInt()
 fun Int(number: ULong): Int = number.toInt()
 fun Int(string: String): Int? = try { string.toInt() } catch (e: NumberFormatException) { null }
+
+// Exact conversion has a separate symbol: Kotlin argument labels do not distinguish
+// overloads, and a Float/Double overload named Int would hijack truncating Int(Number).
+fun IntExactly(exactly: Double): Int? {
+    // JVM conversion saturates, so check the exclusive upper bound before converting.
+    if (!exactly.isFinite() || exactly < Int.MIN_VALUE.toDouble() || exactly >= Int.MAX_VALUE.toDouble() + 1.0) return null
+    val result = exactly.toInt()
+    return if (result.toDouble() == exactly) result else null
+}
+
+fun IntExactly(exactly: Float): Int? = IntExactly(exactly = exactly.toDouble())
+fun IntExactly(exactly: Byte): Int? = exactly.toInt()
+fun IntExactly(exactly: Short): Int? = exactly.toInt()
+fun IntExactly(exactly: Int): Int? = exactly
+fun IntExactly(exactly: Long): Int? = if (exactly >= Int.MIN_VALUE.toLong() && exactly <= Int.MAX_VALUE.toLong()) exactly.toInt() else null
+fun IntExactly(exactly: UByte): Int? = exactly.toInt()
+fun IntExactly(exactly: UShort): Int? = exactly.toInt()
+fun IntExactly(exactly: UInt): Int? = if (exactly <= Int.MAX_VALUE.toUInt()) exactly.toInt() else null
+fun IntExactly(exactly: ULong): Int? = if (exactly <= Int.MAX_VALUE.toULong()) exactly.toInt() else null
+fun IntExactly(exactly: BigInteger): Int? = if (exactly >= BigInteger.valueOf(Int.MIN_VALUE.toLong()) && exactly <= BigInteger.valueOf(Int.MAX_VALUE.toLong())) exactly.toInt() else null
+
+fun Float.squareRoot(): Float = kotlin.math.sqrt(this)
+fun Double.squareRoot(): Double = kotlin.math.sqrt(this)
 
 fun Long(number: Number): Long = number.toLong()
 fun Long(number: UByte): Long = number.toLong()

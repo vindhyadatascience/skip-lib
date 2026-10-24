@@ -126,12 +126,14 @@ class Array<Element>: RandomAccessCollection<Element>, RangeReplaceableCollectio
         if (other !is Sequence<*>) {
             return false
         }
+        // Swift arrays sharing unchanged storage compare equal even with a NaN element.
+        if (other is Array<*> && other.collection === collection) return true
         @Suppress("UNCHECKED_CAST")
         return elementsEqual(other as Sequence<Element>)
     }
 
     override fun hashCode(): Int {
-        return collection.hashCode()
+        return collection.fold(1) { hash, element -> 31 * hash + swiftEquatableHash(element) }
     }
 
     override fun toString(): String {

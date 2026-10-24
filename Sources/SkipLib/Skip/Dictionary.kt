@@ -13,6 +13,20 @@ fun <K, V> dictionaryOf(vararg entries: Tuple2<K, V>): Dictionary<K, V> {
     return dictionary
 }
 
+/// Each element is classified once; groups preserve input order without repeated CoW appends.
+fun <K, E> dictionaryGrouping(grouping: Sequence<E>, by: (E) -> K): Dictionary<K, Array<E>> {
+    val groups = SwiftHashableMap<K, MutableList<E>>()
+    for (element in grouping.iterable) {
+        val key = by(element.sref())
+        val group = groups[key]
+        if (group == null) groups[key.sref()] = arrayListOf(element.sref())
+        else group.add(element.sref())
+    }
+    val result = SwiftHashableMap<K, Array<E>>()
+    for ((key, elements) in groups) result[key] = Array(elements, nocopy = true)
+    return Dictionary(result, nocopy = true)
+}
+
 /// Kotlin representation of a `Swift.Dictionary`.
 ///
 /// - Seealso: `KotlinInterop.kt` for functions to convert to/from Kotlin collection types.
@@ -21,11 +35,11 @@ class Dictionary<K, V>: Collection<Tuple2<K, V>>, MutableStruct, KotlinConvertin
     // shared, we copy on write and rely on our sharing partners to do the same. We may also maintain
     // an entry collection view of ourselves for serving Collection API
     private var isStorageShared = false
-    internal var storage: LinkedHashMap<K, V>
-    internal val mutableStorage: LinkedHashMap<K, V>
+    internal var storage: SwiftHashableMap<K, V>
+    internal val mutableStorage: SwiftHashableMap<K, V>
         get() {
             if (isStorageShared) {
-                storage = LinkedHashMap(storage)
+                storage = SwiftHashableMap(storage)
                 isStorageShared = false
             }
             return storage
@@ -47,7 +61,7 @@ class Dictionary<K, V>: Collection<Tuple2<K, V>>, MutableStruct, KotlinConvertin
     override fun didMutateStorage() = didmutate()
 
     constructor(minimumCapacity: Int = 0) {
-        storage = LinkedHashMap()
+        storage = SwiftHashableMap()
         _entryCollection = EntryCollection(this)
     }
 
@@ -64,7 +78,7 @@ class Dictionary<K, V>: Collection<Tuple2<K, V>>, MutableStruct, KotlinConvertin
             uniqueKeysWithValues.dictionary.isStorageShared = true
             isStorageShared = true
         } else {
-            storage = LinkedHashMap()
+            storage = SwiftHashableMap()
             for (entry in uniqueKeysWithValues.iterable) {
                 if (nocopy) {
                     storage[entry._e0] = entry._e1
@@ -91,11 +105,11 @@ class Dictionary<K, V>: Collection<Tuple2<K, V>>, MutableStruct, KotlinConvertin
 
     @Suppress("UNCHECKED_CAST")
     constructor(map: Map<K, V>, nocopy: Boolean = false, shared: Boolean = false) {
-        if (nocopy && map is LinkedHashMap<*, *>) {
-            storage = map as LinkedHashMap<K, V>
+        if (nocopy && map is SwiftHashableMap<*, *>) {
+            storage = map as SwiftHashableMap<K, V>
             isStorageShared = shared
         } else {
-            storage = LinkedHashMap()
+            storage = SwiftHashableMap()
             for (entry in map) {
                 if (nocopy) {
                     storage[entry.key] = entry.value
@@ -108,7 +122,11 @@ class Dictionary<K, V>: Collection<Tuple2<K, V>>, MutableStruct, KotlinConvertin
     }
 
     fun filter(isIncluded: (Tuple2<K, V>) -> Boolean): Dictionary<K, V> {
-        return Dictionary(storage.filter { isIncluded(Tuple2(it.key, it.value)) }, nocopy = true)
+        val result = SwiftHashableMap<K, V>()
+        for ((key, value) in storage) {
+            if (isIncluded(Tuple2(key, value))) result[key] = value
+        }
+        return Dictionary(result, nocopy = true)
     }
 
     operator fun get(key: K): V? {
@@ -153,12 +171,13 @@ class Dictionary<K, V>: Collection<Tuple2<K, V>>, MutableStruct, KotlinConvertin
     }
 
     fun <T> mapValues(transform: (V) -> T): Dictionary<K, T> {
-        val map = storage.mapValues { transform(it.value) }
+        val map = SwiftHashableMap<K, T>()
+        for ((key, value) in storage) map[key] = transform(value)
         return Dictionary(map, nocopy = true)
     }
 
     fun <T> compactMapValues(transform: (V) -> T?): Dictionary<K, T> {
-        val map = LinkedHashMap<K, T>()
+        val map = SwiftHashableMap<K, T>()
         for (entry in storage) {
             val value = transform(entry.value)
             if (value != null) {
@@ -170,16 +189,16 @@ class Dictionary<K, V>: Collection<Tuple2<K, V>>, MutableStruct, KotlinConvertin
 
     fun updateValue(value: V, forKey: K): V? {
         willmutate()
-        val ret = mutableStorage.put(forKey, value)
+        val ret = mutableStorage.put(forKey.sref(), value.sref())
         didmutate()
-        return ret
+        return ret.sref()
     }
 
     fun removeValue(forKey: K): V? {
         willmutate()
         val ret = mutableStorage.remove(forKey)
         didmutate()
-        return ret
+        return ret.sref()
     }
 
     val keys: Collection<K>
@@ -258,12 +277,13 @@ class Dictionary<K, V>: Collection<Tuple2<K, V>>, MutableStruct, KotlinConvertin
                     return Tuple2(lastEntry.key, lastEntry.value)
                 }
                 override fun remove() {
-                    dictionary.storage.remove(lastEntry.key)
+                    storageIterator.remove()
                 }
             }
         }
 
-        override fun contains(element: Tuple2<K, V>): Boolean = dictionary.storage[element._e0] == element._e1
+        override fun contains(element: Tuple2<K, V>): Boolean = dictionary.storage.containsKey(element._e0) &&
+            swiftEquatableEquals(dictionary.storage[element._e0], element._e1)
         override fun clear() = dictionary.storage.clear()
     }
 

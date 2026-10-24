@@ -471,11 +471,11 @@ fun String.replacing(regex: Regex, maxReplacements: Int = Int.max, with: (Regex.
 }
 
 operator fun String.Companion.invoke(format: String, vararg args: Any): String {
-    return format.kotlinFormatString.format(*args)
+    return java.lang.String.format(java.util.Locale.ROOT, format.kotlinFormatString, *args)
 }
 
 operator fun String.Companion.invoke(format: String, arguments: Array<Any>): String {
-    return format.kotlinFormatString.format(*arguments.toList().toTypedArray())
+    return java.lang.String.format(java.util.Locale.ROOT, format.kotlinFormatString, *arguments.toList().toTypedArray())
 }
 
 // Mapping of valid Objective-C format specifiers into Java format specifiers.

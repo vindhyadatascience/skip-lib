@@ -7,11 +7,10 @@ package skip.lib
 // This typealias is defined to satisfy references in Swift. All types have `hashCode()`. We cannot define this
 // as a protocol because there is no way to make existing Kotlin types (e.g. `kotlin.Int`) conform to new protocols.
 typealias Hashable = Any
-typealias AnyHashable = Hashable
 
 /// Map Swift's `hashValue` to Kotlin's `hashCode()`.
 val Any.hashValue: Int
-    get() = hashCode()
+    get() = swiftEquatableHash(this)
 
 /// Kotlin representation of `Swift.Hasher`.
 class Hasher {
@@ -25,7 +24,7 @@ class Hasher {
 
     companion object {
         fun combine(result: Int, value: Any?): Int {
-            return result * 17 + (value?.hashCode() ?: 0)
+            return result * 17 + swiftEquatableHash(value)
         }
     }
 }
