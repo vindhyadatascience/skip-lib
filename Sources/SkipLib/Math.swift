@@ -270,6 +270,10 @@ public func abs(_ x: Double) -> Double {
     return kotlin.math.abs(x)
 }
 
+public func abs(_ x: Float) -> Float {
+    return kotlin.math.abs(x)
+}
+
 public func abs(_ x: Int) -> Int {
     return kotlin.math.abs(x)
 }
