@@ -84,9 +84,8 @@ import Testing
         // SKIP INSERT: check(skip.lib.swiftEquatableEquals(-0.0, 0.0))
         // SKIP INSERT: check(!skip.lib.swiftEquatableEquals(Double.NaN, Double.NaN))
         // SKIP INSERT: check(!skip.lib.swiftEquatableEquals(1, 1.0))
-        // SKIP INSERT: val erased = skip.lib.AnyHashable(1.0f)
-        // SKIP INSERT: check(erased.base is Float)
-        // SKIP INSERT: check(erased == skip.lib.AnyHashable(1))
+        // SKIP INSERT: check(skip.lib.swiftAnyHashableEquals(1.0f, 1))
+        // SKIP INSERT: check(!skip.lib.swiftAnyHashableEquals(0.1f, 0.1))
         // SKIP INSERT: val set = skip.lib.setOf(-0.0)
         // SKIP INSERT: @Suppress("UNCHECKED_CAST")
         // SKIP INSERT: val view = set.kotlin(nocopy = true) as MutableSet<Double>
@@ -110,43 +109,6 @@ import Testing
         // SKIP INSERT: iterator.next()
         // SKIP INSERT: iterator.remove()
         // SKIP INSERT: check(mutable.size == 1)
-        #endif
-    }
-
-    @Test func anyHashableNumericIdentityAndBase() {
-        #expect(AnyHashable(Int(1)) == AnyHashable(Double(1)))
-        #expect(AnyHashable(Float(1)) == AnyHashable(Double(1)))
-        #expect(AnyHashable(Float(-0.0)) == AnyHashable(Double(0.0)))
-        #expect(AnyHashable(Float(0.1)) != AnyHashable(Double(0.1)))
-        #expect(AnyHashable(true) != AnyHashable(Int(1)))
-        #expect(AnyHashable(Int64(9_007_199_254_740_993)) != AnyHashable(Double(9_007_199_254_740_993)))
-        #expect(AnyHashable(Double.nan) != AnyHashable(Double.nan))
-        let wrapped = AnyHashable(Float(1))
-        #expect(wrapped.base as? Float == Float(1))
-        #expect(wrapped.base as? Double == nil)
-        #expect(Set([AnyHashable(Int(1)), AnyHashable(Float(1)), AnyHashable(Double(1))]).count == 1)
-        #expect([AnyHashable(Int(1)): "one"][AnyHashable(Double(1))] == "one")
-        #expect([AnyHashable(-0.0)] == [AnyHashable(0.0)])
-    }
-
-    @Test func anyHashableTypedOptionalErasure() {
-        let absentInteger: Int? = nil
-        let absentString: String? = nil
-        let presentInteger: Int? = 1
-        let erasedNil = AnyHashable(absentInteger)
-        let erasedNilAgain = AnyHashable(absentInteger)
-        #expect(erasedNil == erasedNilAgain)
-        #expect(erasedNil != AnyHashable(absentString))
-        #expect(AnyHashable(presentInteger) == AnyHashable(1.0))
-        let absentWrapper: AnyHashable? = nil
-        let presentNilWrapper: AnyHashable? = erasedNil
-        #expect(absentWrapper == nil)
-        #expect(presentNilWrapper != nil)
-        #expect(Set([erasedNil, erasedNilAgain, AnyHashable(absentString)]).count == 2)
-        #if SKIP
-        // SKIP INSERT: check(skip.lib.anyHashableOptional(null, type = "Int") == skip.lib.anyHashableOptional(null, type = "Int"))
-        // SKIP INSERT: check(skip.lib.anyHashableOptional(null, type = "Int") != skip.lib.anyHashableOptional(null, type = "String"))
-        // SKIP INSERT: check(skip.lib.anyHashableOptional(1, type = "Int") == skip.lib.AnyHashable(1.0))
         #endif
     }
 

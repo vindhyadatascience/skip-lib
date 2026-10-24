@@ -8,13 +8,10 @@ public protocol Hashable: Equatable {
     var hashValue: Int { get }
 }
 
-public struct AnyHashable: Hashable {
-    public init<H: Hashable>(_ base: H) {
-    }
-
-    public var base: Any { fatalError() }
-    public var hashValue: Int { fatalError() }
-}
+// RNABrowser-fiea.30: AnyHashable stays a typealias. 1.4.4+vds.3 made it a Kotlin wrapper class,
+// and collections from JSONSerialization, Kotlin maps and Firestore payloads hold raw keys, so
+// every `[AnyHashable: Any]` read threw ClassCastException on the JVM.
+typealias AnyHashable = Hashable
 
 public struct Hasher {
     public init() {

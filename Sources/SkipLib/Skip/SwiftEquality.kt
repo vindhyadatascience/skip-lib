@@ -17,43 +17,16 @@ fun swiftEquatableHash(value: Any?): Int = when (value) {
     else -> value?.hashCode() ?: 0
 }
 
-/// Type erasure retains the original value, while numeric equality is exact across numeric types.
-class AnyHashable(value: Any?) {
-    val base: Any = (if (value is AnyHashable) value.base else requireNotNull(value) {
-        "AnyHashable cannot erase Optional.none without its wrapped type; use anyHashableOptional(value, type)."
-    }).sref()
-
-    override fun equals(other: Any?): Boolean {
-        if (other !is AnyHashable) return false
-        val left = exactNumericValue(base)
-        val right = exactNumericValue(other.base)
-        if (left != null && right != null) return left.compareTo(right) == 0
-        // Infinities have no BigDecimal representation, but compare across Float/Double.
-        if (base is Double && other.base is Float) return base == other.base.toDouble()
-        if (base is Float && other.base is Double) return base.toDouble() == other.base
-        return swiftEquatableEquals(base, other.base)
-    }
-
-    override fun hashCode(): Int {
-        val numeric = exactNumericValue(base)
-        if (numeric != null) return numeric.stripTrailingZeros().hashCode()
-        // Float and Double infinities compare equal across their erased representations.
-        if (base is Float && base.isInfinite()) return base.toDouble().hashCode()
-        return swiftEquatableHash(base)
-    }
-
-    override fun toString(): String = base.toString()
-}
-
-/// Optional.some erases as its wrapped value. Optional.none must retain the wrapped static type:
-/// an erased Int? nil and an erased String? nil are different Hashable values, not absent wrappers.
-fun anyHashableOptional(value: Any?, type: String): AnyHashable =
-    AnyHashable(value ?: AnyHashableOptionalNone(type))
-
-private class AnyHashableOptionalNone(val type: String) {
-    override fun equals(other: Any?): Boolean = other is AnyHashableOptionalNone && type == other.type
-    override fun hashCode(): Int = 0
-    override fun toString(): String = "nil"
+/// Swift's exact cross-numeric Hashable equality (`AnyHashable(1) == AnyHashable(1.0)`), for runtime
+/// code that compares erased identities. AnyHashable itself stays a typealias (RNABrowser-fiea.30).
+fun swiftAnyHashableEquals(lhs: Any, rhs: Any): Boolean {
+    val left = exactNumericValue(lhs)
+    val right = exactNumericValue(rhs)
+    if (left != null && right != null) return left.compareTo(right) == 0
+    // Infinities have no BigDecimal representation, but compare across Float/Double.
+    if (lhs is Double && rhs is Float) return lhs == rhs.toDouble()
+    if (lhs is Float && rhs is Double) return lhs.toDouble() == rhs
+    return swiftEquatableEquals(lhs, rhs)
 }
 
 // BigDecimal(Double), unlike valueOf(Double), preserves the exact binary value. This avoids
