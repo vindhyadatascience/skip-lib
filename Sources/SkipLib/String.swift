@@ -14,6 +14,57 @@ public struct String: RandomAccessCollection {
     public init(_ string: String) {
     }
 
+    // These concrete Swift conversions already use the positional Kotlin
+    // String(describing: Any?) implementation. Keep source matching narrower
+    // than Any so arbitrary objects still require String(describing:).
+    public init(_ value: Bool) {
+    }
+
+    public init(_ value: Character) {
+    }
+
+    public init(_ value: Int) {
+    }
+
+    public init(_ value: Int8) {
+    }
+
+    public init(_ value: Int16) {
+    }
+
+    public init(_ value: Int32) {
+    }
+
+    public init(_ value: Int64) {
+    }
+
+    public init(_ value: Int128) {
+    }
+
+    public init(_ value: UInt) {
+    }
+
+    public init(_ value: UInt8) {
+    }
+
+    public init(_ value: UInt16) {
+    }
+
+    public init(_ value: UInt32) {
+    }
+
+    public init(_ value: UInt64) {
+    }
+
+    public init(_ value: UInt128) {
+    }
+
+    public init(_ value: Float) {
+    }
+
+    public init(_ value: Double) {
+    }
+
     public init(_ substring: Substring) {
     }
 
