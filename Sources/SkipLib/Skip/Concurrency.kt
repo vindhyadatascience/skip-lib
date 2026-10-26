@@ -150,18 +150,47 @@ class Task<T> {
     }
 }
 
+// The host sets this process property from its actual debug-build constant. Until
+// configured, false and unrecognized values use release-safe diagnostics. A property
+// also lets older host code configure newer runtimes without a Swift API dependency.
+private const val taskFailureLoggingMessagesProperty = "skip.lib.taskFailureLogging.includeMessages"
+
 // ART retains Dalvik's VM name; a regular JVM (including Robolectric) uses stderr.
 private fun reportTaskPlatformFailure(failure: Throwable) {
     try {
+        val includeMessages = try {
+            java.lang.Boolean.getBoolean(taskFailureLoggingMessagesProperty)
+        } catch (_: SecurityException) {
+            false
+        }
         if (System.getProperty("java.vm.name") == "Dalvik") {
-            android.util.Log.e("SkipLib.Task", "Non-Swift failure in Task", failure)
+            if (includeMessages) {
+                android.util.Log.e("SkipLib.Task", "Non-Swift failure in Task", failure)
+            } else {
+                // Never pass the Throwable: Android would format its message, causes
+                // and suppressed exceptions even if our own message were sanitized.
+                android.util.Log.e("SkipLib.Task", taskPlatformFailureFrames(failure))
+            }
         } else {
             val stderr = System.err
-            stderr.println("SkipLib.Task: Non-Swift failure in Task")
-            failure.printStackTrace(stderr)
+            if (includeMessages) {
+                stderr.println("SkipLib.Task: Non-Swift failure in Task")
+                failure.printStackTrace(stderr)
+            } else {
+                stderr.println("SkipLib.Task: " + taskPlatformFailureFrames(failure))
+            }
         }
     } catch (_: Throwable) {
         // A broken logging sink must never replace the task's original failure.
+    }
+}
+
+private fun taskPlatformFailureFrames(failure: Throwable): String = kotlin.text.buildString {
+    append("Non-Swift failure in Task: ")
+    append(failure.javaClass.name)
+    for (frame in failure.stackTrace) {
+        append("\n\tat ")
+        append(frame.toString())
     }
 }
 
