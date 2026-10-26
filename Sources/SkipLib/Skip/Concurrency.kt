@@ -21,7 +21,17 @@ class Task<T> {
         val dispatcher = if (isMainActor) Dispatchers.Main else priority.dispatcher
         // Store a TaskState in our context-aware storage so that we can access it statically in e.g. Task.isCancelled
         deferred = (scope ?: GlobalScope).async(dispatcher + Companion.currentState.asContextElement(state)) {
-            operation()
+            try {
+                operation()
+            } catch (failure: Throwable) {
+                // async retains failures until await. Platform failures must remain visible
+                // even when the Swift caller discards its Task, while Swift errors and
+                // cancellation keep their existing handling. Rethrow for awaited tasks.
+                if (failure !is Error && failure !is CancellationException) {
+                    reportTaskPlatformFailure(failure)
+                }
+                throw failure
+            }
         }
     }
 
@@ -137,6 +147,21 @@ class Task<T> {
                 }
             }
         }
+    }
+}
+
+// ART retains Dalvik's VM name; a regular JVM (including Robolectric) uses stderr.
+private fun reportTaskPlatformFailure(failure: Throwable) {
+    try {
+        if (System.getProperty("java.vm.name") == "Dalvik") {
+            android.util.Log.e("SkipLib.Task", "Non-Swift failure in Task", failure)
+        } else {
+            val stderr = System.err
+            stderr.println("SkipLib.Task: Non-Swift failure in Task")
+            failure.printStackTrace(stderr)
+        }
+    } catch (_: Throwable) {
+        // A broken logging sink must never replace the task's original failure.
     }
 }
 
