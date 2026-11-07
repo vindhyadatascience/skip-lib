@@ -343,6 +343,19 @@ import Testing
         #expect(flatMapped == ["a", "a", "b", "b", "c", "c"])
     }
 
+    @Test func unsignedStringFormats() {
+        #expect(String(format: "%llu", UInt64(0)) == "0")
+        #expect(String(format: "%llu", UInt64.max) == "18446744073709551615")
+        #expect(String(format: "%lu", UInt64.max) == "18446744073709551615")
+        #expect(String(format: "%u", UInt32.max) == "4294967295")
+        #expect(String(format: "%u", UInt16.max) == "65535")
+        #expect(String(format: "%u", UInt8.max) == "255")
+        #expect(String(format: "%2$@ %1$llu %3$lld", UInt64.max, "tail", Int64.min)
+            == "tail 18446744073709551615 -9223372036854775808")
+        #expect(String(format: "%%%llu", UInt64.max) == "%18446744073709551615")
+        #expect(String(format: "%llu", arguments: [UInt64.max]) == "18446744073709551615")
+    }
+
     @Test func stringFormat() {
         #expect(String(format: "%%") == "%") // Escaping percent sign
         #expect(String(format: "%d", 42) == "42") // Integer format

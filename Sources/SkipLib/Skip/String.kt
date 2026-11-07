@@ -489,11 +489,13 @@ private val objc2JavaPatterns = mapOf(
     "lld" to "d",
     "ld" to "d",
     "u" to "d",
+    "lu" to "d",
+    "llu" to "d",
 )
 
-// This will create the regular expression: "(?<!%)%(\\d+\\$)?(\\d*\\.?\\d+)?(@|d|f|llf|lf|lld|ld|u)"
-// (?<!%) is a negative lookbehind assertion, ensuring that % is not preceded by another % (which is how literal "%" characters are escaped)
-private val objcPatternSpecifiers = kotlin.text.Regex("(?<!%)%(\\d+\\$)?(\\d*\\.?\\d+)?(${objc2JavaPatterns.keys.sorted().joinToString("|")})")
+// Consume escaped percent pairs before looking for substitutions, including the
+// final substitution in adjacent patterns such as "%%%llu".
+private val objcPatternSpecifiers = kotlin.text.Regex("%%|%(\\d+\\$)?(\\d*\\.?\\d+)?(${objc2JavaPatterns.keys.sorted().joinToString("|")})")
 
 /// Convert from Swift String.init(format:) pattern into a Kotlin-compatible format string: https://kotlinlang.org/docs/strings.html#string-formatting
 val String.kotlinFormatString: String
@@ -506,7 +508,9 @@ fun String.kotlinFormatInfo(interpolationIndex: Int = 0, removePositions: Boolea
     var nextInterpolationIndex = interpolationIndex + 1
     var interpolationIndexes: MutableList<Int>? = null
     val format = objcPatternSpecifiers.replace(this) { matchResult ->
-        val matchedString = matchResult.value
+        if (matchResult.value == "%%") {
+            return@replace "%%"
+        }
         val positionalArg = matchResult.groupValues[1] // may be empty
         if (interpolationIndexes == null) {
             interpolationIndexes = ArrayList<Int>(3)
@@ -531,6 +535,27 @@ fun String.kotlinFormatInfo(interpolationIndex: Int = 0, removePositions: Boolea
     }
     return Pair(format, interpolationIndexes)
 }
+
+// java.util.Formatter does not accept Kotlin's boxed unsigned value classes.
+// BigInteger retains the full unsigned range while supporting decimal padding,
+// grouping, and argument positions. Leave every other argument type unchanged.
+private fun unsignedFormatArguments(args: kotlin.Array<out Any?>): kotlin.Array<out Any?> {
+    if (args.none { it is UByte || it is UShort || it is UInt || it is ULong }) {
+        return args
+    }
+    return args.map { value ->
+        when (value) {
+            is UByte, is UShort, is UInt, is ULong -> java.math.BigInteger(value.toString())
+            else -> value
+        }
+    }.toTypedArray()
+}
+
+fun String.format(vararg args: Any?): String =
+    java.lang.String.format(this, *unsignedFormatArguments(args))
+
+fun String.format(locale: java.util.Locale?, vararg args: Any?): String =
+    java.lang.String.format(locale, this, *unsignedFormatArguments(args))
 
 fun zip(sequence1: String, sequence2: String): Array<Tuple2<Char, Char>> {
     val zipped = sequence1.zip(sequence2)
