@@ -15,7 +15,7 @@ fun Byte.Companion.random(in_: IntRange, using: InOut<RandomNumberGenerator>? = 
     return Byte(in_.start + mod)
 }
 
-val UByte.Companion.max: Byte get() = Byte.MAX_VALUE
+val UByte.Companion.max: UByte get() = UByte.MAX_VALUE
 val UByte.Companion.min: UByte get() = UByte.MIN_VALUE
 fun UByte.Companion.random(in_: UIntRange, using: InOut<RandomNumberGenerator>? = null): UByte {
     if (in_.endInclusive < in_.start) {

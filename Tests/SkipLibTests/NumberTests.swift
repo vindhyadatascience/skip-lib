@@ -3,6 +3,12 @@ import Testing
 import XCTest
 
 @Suite struct NumberTests {
+    @Test func unsignedByteBounds() {
+        let maximum: UInt8 = UInt8.max
+        #expect(maximum == UInt8(255))
+        #expect(UInt8.min == UInt8(0))
+    }
+
     @Test func numberMinMax() {
         #if !SKIP
         #expect(Int8.max > Int8.min)
